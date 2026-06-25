@@ -17,22 +17,43 @@ async def main():
         )
         page = await browser.new_page()
         
-        print("🔑 Mencoba login ke iVASMS...")
-        await page.goto("https://www.ivasms.com/login", timeout=90000)
-        
-        await page.fill('input[name="email"]', EMAIL)
-        await page.fill('input[name="password"]', PASSWORD)
-        await page.click('button[type="submit"]')
-        
-        await asyncio.sleep(10)
-        print("✅ Login selesai!")
+        # Tambahan anti-detection
+        await page.set_extra_http_headers({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
 
-        # Test buka halaman SMS
-        await page.goto("https://www.ivasms.com/portal/sms/received", timeout=60000)
-        print("✅ Halaman SMS berhasil dibuka!")
-        print("🕒 Test berhasil pada:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        print("🔑 Membuka halaman login...")
+        await page.goto("https://www.ivasms.com/login", timeout=90000, wait_until="domcontentloaded")
+        
+        # Tunggu lebih lama + cek Cloudflare
+        await asyncio.sleep(8)
+        
+        # Cek apakah ada Cloudflare
+        if await page.locator("text=Cloudflare").count() > 0 or await page.locator("text=Checking your browser").count() > 0:
+            print("❌ Cloudflare detected! Bot terblokir.")
+        else:
+            print("✅ Halaman login terbuka")
 
-        # Biar bot tetap jalan
+        # Coba isi form dengan timeout lebih panjang
+        try:
+            await page.wait_for_selector('input[name="email"]', timeout=30000)
+            await page.fill('input[name="email"]', EMAIL)
+            await page.fill('input[name="password"]', PASSWORD)
+            print("✅ Form diisi")
+            
+            await page.click('button[type="submit"]')
+            print("✅ Tombol login diklik")
+            
+            await asyncio.sleep(10)
+            print("✅ Login selesai. Cek URL sekarang:", page.url)
+            
+        except Exception as e:
+            print("❌ Error saat isi form:", e)
+            # Simpan screenshot untuk debug
+            await page.screenshot(path="error_screenshot.png")
+            print("📸 Screenshot disimpan (error_screenshot.png)")
+
+        # Biar bot tetap hidup
         while True:
             print("✅ Bot masih berjalan -", datetime.now().strftime("%H:%M:%S"))
             await asyncio.sleep(30)

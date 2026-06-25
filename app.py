@@ -18,53 +18,43 @@ async def main():
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-blink-features=AutomationControlled',
-                '--disable-web-security'
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor'
             ]
         )
         
-        page = await browser.new_page()
+        context = await browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        )
         
-        # Stealth headers
-        await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-        })
+        page = await context.new_page()
 
-        print("🔑 Membuka halaman login...")
+        print("🔑 Membuka halaman login... (tunggu Cloudflare)")
         await page.goto("https://www.ivasms.com/login", timeout=120000, wait_until="domcontentloaded")
         
-        await asyncio.sleep(12)  # Tunggu lebih lama
+        await asyncio.sleep(15)   # Kasih waktu Cloudflare challenge
 
-        # Diagnostic
         title = await page.title()
         print(f"📄 Page Title: {title}")
-        
-        content = await page.content()
-        if "Cloudflare" in content or "checking your browser" in content.lower():
-            print("❌ Cloudflare Challenge Detected!")
-        else:
-            print("✅ Tidak terdeteksi Cloudflare")
 
-        # Coba cari input dengan berbagai cara
-        try:
-            await page.wait_for_selector('input[name="email"], input[type="email"]', timeout=30000)
+        # Cek apakah form login muncul
+        email_count = await page.locator('input[name="email"]').count()
+        print(f"🔍 Input email ditemukan: {email_count}")
+
+        if email_count > 0:
+            print("✅ Form login muncul!")
             await page.fill('input[name="email"]', EMAIL)
             await page.fill('input[name="password"]', PASSWORD)
-            print("✅ Form berhasil diisi")
-            
-            await page.click('button[type="submit"], button:contains("Login")')
-            print("✅ Tombol login diklik")
-            
+            await page.click('button[type="submit"]')
+            print("✅ Login diklik")
             await asyncio.sleep(10)
-            print("Current URL:", page.url)
-            
-        except Exception as e:
-            print("❌ Error saat login:", str(e))
-            await page.screenshot(path="login_error.png")
-            print("📸 Screenshot error disimpan")
+        else:
+            print("❌ Form login TIDAK muncul (masih Cloudflare)")
 
         # Keep alive
         while True:
-            print(f"✅ Bot masih hidup - {datetime.now().strftime('%H:%M:%S')}")
+            print(f"✅ Bot hidup - {datetime.now().strftime('%H:%M:%S')}")
             await asyncio.sleep(30)
 
 asyncio.run(main())
